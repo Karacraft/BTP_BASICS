@@ -1,0 +1,4 @@
+@EndUserText.label: 'Service Expose'
+define service Z_expose_covid_countries {
+  expose ZCOVID_COUNTRY_WISE as covids;
+}
