@@ -9,11 +9,14 @@ CLASS zcl_abap_syntax DEFINITION
 
     CLASS-DATA out TYPE REF TO if_oo_adt_classrun_out .
 
+    METHODS read_itab.
     METHODS inline_declaration .
     METHODS value_declaration .
     METHODS corresponding_declaration .
     METHODS cond_conv .
     METHODS group_by_statement .
+    METHODS filter_data.
+    METHODS reduce_data.
 
   PROTECTED SECTION.
   PRIVATE SECTION.
@@ -26,11 +29,27 @@ CLASS zcl_abap_syntax IMPLEMENTATION.
 
   METHOD if_oo_adt_classrun~main.
     me->out = out.  " Add Reference
+
+*    me->read_itab( ).
 *    me->inline_declaration( ).
 *    me->value_declaration( ).
 *    me->corresponding_declaration( ).
 *    me->cond_conv(  ).
-    me->group_by_statement( ).
+*    me->group_by_statement( ).
+*    me->filter_data(  ).
+    me->reduce_data(  ).
+  ENDMETHOD.
+
+  METHOD read_itab.
+
+    SELECT * FROM /dmo/booking INTO TABLE @DATA(itab) UP TO 1000 ROWS.
+*    out->write( itab ).
+    TRY.
+        DATA(ls_out) = itab[ carrier_id = 'UA' ].
+        out->write( ls_out ).
+      CATCH cx_sy_itab_line_not_found.
+        out->write( |Read failed| ).
+    ENDTRY.
   ENDMETHOD.
 
   METHOD inline_declaration.
@@ -136,14 +155,16 @@ CLASS zcl_abap_syntax IMPLEMENTATION.
 *    ENDLOOP.
 **********************************************************************
 *    what if you want to send result back to a function
-    data(rs_group) = value tt_bookings(  ). " First create emtpy
+    DATA(rs_group) = VALUE tt_bookings(  ). " First create emtpy
 **********************************************************************
+*    GROUP BY FIELD ON LOOP
     LOOP AT lt_bookings INTO DATA(wa1) GROUP BY wa1-travel_id.
       out->write( |Travel Request {  wa1-travel_id }| ).
+*      LOOP AT CHILD AND PRINT
       LOOP AT GROUP wa1 INTO DATA(wa1c).
 **********************************************************************
 *    what if you want to send result back to a function
-    rs_group = value #( BASE lt_bookings ( wa1c ) ). " then add child - Now its all back without grouping
+        rs_group = VALUE #( BASE lt_bookings ( wa1c ) ). " then add child - Now its all back without grouping
 **********************************************************************
         out->write( |Bookings { wa1c-booking_id } - { wa1c-carrier_id } - { wa1c-flight_price } | ).
         total = total + wa1c-flight_price.
@@ -155,4 +176,27 @@ CLASS zcl_abap_syntax IMPLEMENTATION.
     out->write( rs_group ).
   ENDMETHOD.
 
+  METHOD filter_data.
+    DATA: ret TYPE SORTED TABLE OF /dmo/booking WITH UNIQUE  KEY carrier_id,
+          ch  TYPE c LENGTH 3.
+    ch = 'UA'.
+    SELECT * FROM /dmo/booking INTO TABLE @DATA(itab) UP TO 1000 ROWS.
+    DATA(uas) = FILTER #( ret WHERE carrier_id = ch ).
+    out->write( uas ).
+  ENDMETHOD.
+
+  METHOD reduce_data.
+    "With implicit data type
+    DATA(lv_sum) = REDUCE #( INIT s = 0
+                             FOR  i = 1 UNTIL i > 50
+                             NEXT s = s + i ).
+
+    "With specified data type
+    DATA(lv_sum1) = REDUCE i( INIT s = 0
+                             FOR  i = 1 UNTIL i > 50
+                             NEXT s = s + i ).
+
+    out->write( lv_sum ).
+    out->write( lv_sum1 ).
+  ENDMETHOD.
 ENDCLASS.
